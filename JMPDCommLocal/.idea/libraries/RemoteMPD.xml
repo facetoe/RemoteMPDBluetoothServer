@@ -1,0 +1,18 @@
+<component name="libraryTable">
+  <library name="RemoteMPD">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/IdeaProjects/RemoteMPD/zippedIcons/media_pause.zip!/" />
+      <root url="jar://$USER_HOME$/IdeaProjects/RemoteMPD/zippedIcons/media_fast_backward.zip!/" />
+      <root url="jar://$USER_HOME$/IdeaProjects/RemoteMPD/zippedIcons/ic_media_random.zip!/" />
+      <root url="jar://$USER_HOME$/IdeaProjects/RemoteMPD/zippedIcons/media_volume.zip!/" />
+      <root url="jar://$USER_HOME$/IdeaProjects/RemoteMPD/zippedIcons/ic_media_next.zip!/" />
+      <root url="jar://$USER_HOME$/IdeaProjects/RemoteMPD/zippedIcons/media_fast_forward.zip!/" />
+      <root url="jar://$USER_HOME$/IdeaProjects/RemoteMPD/zippedIcons/media_play.zip!/" />
+      <root url="jar://$USER_HOME$/IdeaProjects/RemoteMPD/zippedIcons/ic_media_volume.zip!/" />
+      <root url="jar://$USER_HOME$/IdeaProjects/RemoteMPD/zippedIcons/ic_media_repeat.zip!/" />
+      <root url="jar://$USER_HOME$/IdeaProjects/RemoteMPD/zippedIcons/ic_media_prev.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

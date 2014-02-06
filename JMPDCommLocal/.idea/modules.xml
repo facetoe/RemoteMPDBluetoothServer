@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/JMPDCommLocal.iml" filepath="$PROJECT_DIR$/JMPDCommLocal.iml" />
+      <module fileurl="file://$USER_HOME$/IdeaProjects/JMPDCommRemote/JMPDCommRemote.iml" filepath="$USER_HOME$/IdeaProjects/JMPDCommRemote/JMPDCommRemote.iml" />
+      <module fileurl="file://$USER_HOME$/IdeaProjects/RemoteBluetoothServer/RemoteBluetoothServer.iml" filepath="$USER_HOME$/IdeaProjects/RemoteBluetoothServer/RemoteBluetoothServer.iml" />
+      <module fileurl="file://$USER_HOME$/IdeaProjects/RemoteMPD/RemoteMPD.iml" filepath="$USER_HOME$/IdeaProjects/RemoteMPD/RemoteMPD.iml" />
+    </modules>
+  </component>
+</project>
+

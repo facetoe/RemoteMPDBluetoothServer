@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="lib">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/IdeaProjects/RemoteBluetoothServer/lib/javampd-4.2.jar!/" />
+      <root url="jar://$USER_HOME$/IdeaProjects/RemoteBluetoothServer/lib/bluecove-2.1.0.jar!/" />
+      <root url="jar://$USER_HOME$/IdeaProjects/RemoteBluetoothServer/lib/gson-2.2.4.jar!/" />
+      <root url="jar://$USER_HOME$/IdeaProjects/RemoteBluetoothServer/lib/commons-cli-1.2.jar!/" />
+      <root url="jar://$USER_HOME$/IdeaProjects/RemoteBluetoothServer/lib/bluecove-gpl-2.1.0.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

@@ -1,0 +1,13 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="RemoteBluetoothServer:jar">
+    <output-path>$PROJECT_DIR$/classes/artifacts/RemoteBluetoothServer_jar</output-path>
+    <root id="archive" name="RemoteBluetoothServer.jar">
+      <element id="module-output" name="RemoteBluetoothServer" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/lib/bluecove-2.1.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/lib/bluecove-gpl-2.1.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/lib/commons-cli-1.2.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/lib/javampd-4.2.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/lib/gson-2.2.4.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>
