@@ -8,7 +8,6 @@ import java.io.Serializable;
  * Created by facetoe on 26/12/13.
  */
 public class MPDResponse implements Serializable {
-    private static final String TAG = MPDResponse.class.getSimpleName();
 
     // Event-ID's for PMix internal events...
     public static final int EVENT_CONNECT = 0;
@@ -31,6 +30,7 @@ public class MPDResponse implements Serializable {
     public static final int EVENT_VOLUME = 18;
     public static final int EVENT_TRACKPOSITION = 19;
     public static final int EVENT_UPDATE_PLAYLIST = 20;
+    public static final int EVENT_CHECK_PLAYLIST_HASH = 21;
 
     private int responseType;
     private int numObjects;
