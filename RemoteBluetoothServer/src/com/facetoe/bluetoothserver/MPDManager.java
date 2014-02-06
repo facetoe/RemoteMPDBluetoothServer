@@ -7,7 +7,11 @@ import org.a0z.mpdlocal.event.TrackPositionListener;
 import org.a0z.mpdlocal.exception.MPDServerException;
 
 import javax.microedition.io.StreamConnection;
+import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 import java.io.*;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -18,6 +22,8 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
     private final boolean DEBUG = true;
     private final MPD mpdComm;
     private final Gson gson = new Gson();
+    private MessageDigest md5;
+    private String oldMusicListHash = "";
 
     private StreamConnection connection;
     private BufferedReader inputStream;
@@ -29,14 +35,19 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
     private String password;
     private MPDStatusMonitor statusMonitor;
 
-
     public MPDManager(StreamConnection connection, String password, int port, String host)
             throws MPDServerException, IOException {
+
         this.connection = connection;
         this.password = password;
         this.port = port;
         this.host = host;
         this.mpdComm = new MPD();
+        try {
+            md5 = MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
         initConnection();
     }
 
@@ -50,6 +61,8 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
 
         inputStream = new BufferedReader(new InputStreamReader(connection.openInputStream()));
         outputStream = new PrintStream(new BufferedOutputStream(connection.openOutputStream()), true, "UTF-8");
+
+        oldMusicListHash = computeMD5Hash(getMusicList());
     }
 
     public void run() throws IOException {
@@ -83,6 +96,8 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
     }
 
     private void processCommand(String command) {
+        if(command.isEmpty()) return;
+
         try {
             if (command.equals(MPDCommand.MPD_CMD_PLAY)) mpdComm.play();
             else if (command.equals(MPDCommand.MPD_CMD_NEXT)) mpdComm.next();
@@ -99,8 +114,10 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
 
     private int extractInt(String str) {
         Matcher m = digit.matcher(str);
-        if (m.find()) return Integer.parseInt(m.group());
-        else return -1;
+        if (m.find())
+            return Integer.parseInt(m.group());
+        else
+            return -1;
     }
 
     private void write(Object obj) {
@@ -120,17 +137,41 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
     @Override
     public void playlistChanged(MPDStatus mpdStatus, int oldPlaylistVersion) {
         if (DEBUG) System.out.println("Playlist changed");
-        updatePlaylist();
+        maybeUpdatePlaylist();
+    }
+
+    private void maybeUpdatePlaylist() {
+        if(playlistHashChanged())
+            updatePlaylist();
+    }
+
+    private boolean playlistHashChanged() {
+        List<Music> musicList = getMusicList();
+        String newMusicListHash = computeMD5Hash(musicList);
+        return !oldMusicListHash.equals(newMusicListHash);
+    }
+
+    private String computeMD5Hash(Object data) {
+        String hash = "";
+        try {
+            byte[] dataBytes = data.toString().getBytes("UTF-8");
+            hash =  (new HexBinaryAdapter()).marshal(md5.digest(dataBytes));
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+        return hash;
     }
 
     private void updatePlaylist() {
-        if (DEBUG) System.out.println("Refreshing playlist");
-        long startTime = System.nanoTime();
-        mpdComm.getPlaylist().playlistChanged(null, -1);
-        MPDPlaylist playlist = mpdComm.getPlaylist();
-        write(new MPDResponse(MPDResponse.EVENT_UPDATE_PLAYLIST, playlist.getMusicList()));
-        if (DEBUG)
-            System.out.println("Updated playlist in " + (System.nanoTime() - startTime) / 1000000000 + " seconds");
+        if(DEBUG) System.out.println("Updating playlist");
+        List<Music> music = getMusicList();
+        oldMusicListHash = computeMD5Hash(music);
+        write(new MPDResponse(MPDResponse.EVENT_UPDATE_PLAYLIST, music));
+    }
+
+    private List<Music> getMusicList() {
+        mpdComm.getPlaylist().playlistChanged(null, -1); // Force a playlist refresh
+        return mpdComm.getPlaylist().getMusicList();
     }
 
     @Override
