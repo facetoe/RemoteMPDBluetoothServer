@@ -1,11 +1,8 @@
 package org.a0z.mpdlocal;
 
-
-
 import java.util.Arrays;
-import java.util.List;
 
-public class MPDCommand {
+public class MPDCommand extends AbstractCommand {
     private static final boolean DEBUG = false;
 
     public static final int MIN_VOLUME = 0;
@@ -49,12 +46,9 @@ public class MPDCommand {
     public static final String MPD_CMD_PLAYLIST_MOVE = "playlistmove";
     public static final String MPD_CMD_PLAYLIST_DEL = "playlistdelete";
 
-    /* Refresh the playlist */
+    // Refresh the playlist
     public static final String MPD_CMD_PLAYLIST_CHANGES = "plchanges";
 
-
-    public static final List<String> NON_RETRYABLE_COMMANDS = Arrays.asList(MPD_CMD_NEXT,MPD_CMD_PREV,MPD_CMD_PLAYLIST_ADD,MPD_CMD_PLAYLIST_MOVE,MPD_CMD_PLAYLIST_DEL) ;
-    private boolean sentToServer = false;
     public static final String MPD_CMD_IDLE="idle";
     public static final String MPD_CMD_PING = "ping";
 
@@ -80,55 +74,18 @@ public class MPDCommand {
     public static final String MPD_TAG_ALBUM_ARTIST = "albumartist";
     public static final String MPD_TAG_GENRE = "genre";
 
-    String command = null;
-    String[] args = null;
-
-    private boolean synchronous = true;
-
-    public void setSynchronous(boolean synchronous) {
-        this.synchronous = synchronous;
-    }
-
     public MPDCommand(String _command, String... _args) {
-        this.command = _command;
-        this.args = _args;
-    }
-
-    public String toString() {
-        StringBuffer outBuf = new StringBuffer();
-        outBuf.append(command);
-        for (String arg : args) {
-            if(arg == null)
-                continue;
-            arg = arg.replaceAll("\"", "\\\\\"");
-            outBuf.append(" \"" + arg + "\"");
-        }
-        outBuf.append("\n");
-        final String outString = outBuf.toString();
-        if (DEBUG)
-            System.out.println("Mpd command : " + (outString.startsWith("password ") ? "password **censored**" : outString));
-        return outString;
-    }
-
-    public boolean isSynchronous() {
-        return synchronous;
+        super(_command, _args);
+        setNonRetryableCommands();
     }
 
     public MPDCommand(String command, String[] args, boolean synchronous) {
-        this.command = command;
-        this.args = args;
+        super(command, args);
         this.synchronous = synchronous;
+        setNonRetryableCommands();
     }
 
-    public static boolean isRetryable(String command) {
-        return !NON_RETRYABLE_COMMANDS.contains(command);
-    }
-
-    public boolean isSentToServer() {
-        return sentToServer;
-    }
-
-    public void setSentToServer(boolean sentToServer) {
-        this.sentToServer = sentToServer;
+    private void setNonRetryableCommands() {
+        NON_RETRYABLE_COMMANDS = Arrays.asList(MPD_CMD_NEXT, MPD_CMD_PREV, MPD_CMD_PLAYLIST_ADD, MPD_CMD_PLAYLIST_MOVE, MPD_CMD_PLAYLIST_DEL);
     }
 }

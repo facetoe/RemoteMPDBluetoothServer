@@ -11,6 +11,7 @@ import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 import java.io.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -20,7 +21,7 @@ import java.util.regex.Pattern;
  */
 public class MPDManager implements TrackPositionListener, StatusChangeListener {
     private final boolean DEBUG = true;
-    private final MPD mpdComm;
+    private final MPD mpd;
     private final Gson gson = new Gson();
     private MessageDigest md5;
     private String oldMusicListHash = "";
@@ -42,7 +43,7 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
         this.password = password;
         this.port = port;
         this.host = host;
-        this.mpdComm = new MPD();
+        this.mpd = new MPD();
         try {
             md5 = MessageDigest.getInstance("MD5");
         } catch (NoSuchAlgorithmException e) {
@@ -52,9 +53,9 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
     }
 
     private void initConnection() throws MPDServerException, IOException {
-        mpdComm.connect(host, port, password);
+        mpd.connect(host, port, password);
 
-        statusMonitor = new MPDStatusMonitor(mpdComm, 1000);
+        statusMonitor = new MPDStatusMonitor(mpd, 1000);
         statusMonitor.addStatusChangeListener(this);
         statusMonitor.addTrackPositionListener(this);
         statusMonitor.start();
@@ -85,7 +86,7 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
     private void shutDown() throws IOException {
         try {
             statusMonitor.giveup();
-            mpdComm.disconnect();
+            mpd.disconnect();
             inputStream.close();
             outputStream.close();
             connection.close();
@@ -99,14 +100,35 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
         if(command.isEmpty()) return;
 
         try {
-            if (command.equals(MPDCommand.MPD_CMD_PLAY)) mpdComm.play();
-            else if (command.equals(MPDCommand.MPD_CMD_NEXT)) mpdComm.next();
-            else if (command.equals(MPDCommand.MPD_CMD_PREV)) mpdComm.previous();
-            else if (command.equals(MPDCommand.MPD_CMD_VOLUME)) mpdComm.adjustVolume(extractInt(command));
-            else if (command.startsWith(MPDCommand.MPD_CMD_PLAY_ID)) mpdComm.skipToId(extractInt(command));
-            else if (command.startsWith(MPDCommand.MPD_CMD_PLAYLIST_CHANGES)) updatePlaylist();
-            else if (command.equals(MPDCommand.MPD_CMD_STOP)) mpdComm.stop();
-            else if (DEBUG) System.out.println("Unknown command: " + command);
+            if (command.equals(MPDCommand.MPD_CMD_PLAY))
+                mpd.play();
+            else if (command.equals(MPDCommand.MPD_CMD_NEXT))
+                mpd.next();
+            else if (command.equals(MPDCommand.MPD_CMD_PREV))
+                mpd.previous();
+            else if (command.equals(MPDCommand.MPD_CMD_VOLUME))
+                mpd.adjustVolume(extractInt(command));
+            else if (command.startsWith(MPDCommand.MPD_CMD_PLAY_ID))
+                mpd.skipToId(extractInt(command));
+            else if (command.startsWith(MPDCommand.MPD_CMD_PLAYLIST_CHANGES))
+                updatePlaylist();
+            else if (command.equals(MPDCommand.MPD_CMD_STOP))
+                mpd.stop();
+            else if(command.equals(BTServerCommand.REQUEST_PLAYLIST_HASH))
+                sendPlaylistHash();
+
+            else if (DEBUG)
+                System.out.println("Unknown command: " + command);
+        } catch (MPDServerException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void sendPlaylistHash() {
+        try {
+            List<Music> playlist = mpd.getPlaylistSongs();
+            String hash = computeMD5Hash(playlist);
+            sendResponse(new MPDResponse(MPDResponse.EVENT_CHECK_PLAYLIST_HASH, hash));
         } catch (MPDServerException e) {
             e.printStackTrace();
         }
@@ -120,7 +142,7 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
             return -1;
     }
 
-    private void write(Object obj) {
+    private void sendResponse(Object obj) {
         write(gson.toJson(obj));
     }
 
@@ -131,7 +153,7 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
     @Override
     public void volumeChanged(MPDStatus mpdStatus, int oldVolume) {
         if (DEBUG) System.out.println("Volume changed");
-        write(new MPDResponse(MPDResponse.EVENT_VOLUME, mpdStatus, oldVolume));
+        sendResponse(new MPDResponse(MPDResponse.EVENT_VOLUME, mpdStatus, oldVolume));
     }
 
     @Override
@@ -166,53 +188,57 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
         if(DEBUG) System.out.println("Updating playlist");
         List<Music> music = getMusicList();
         oldMusicListHash = computeMD5Hash(music);
-        write(new MPDResponse(MPDResponse.EVENT_UPDATE_PLAYLIST, music));
+        sendResponse(new MPDResponse(MPDResponse.EVENT_UPDATE_PLAYLIST, new MPDCachedPlaylist(oldMusicListHash, music)));
     }
 
     private List<Music> getMusicList() {
-        mpdComm.getPlaylist().playlistChanged(null, -1); // Force a playlist refresh
-        return mpdComm.getPlaylist().getMusicList();
+        try {
+            return mpd.getPlaylistSongs();
+        } catch (MPDServerException e) {
+            e.printStackTrace();
+        }
+        return Collections.emptyList();
     }
 
     @Override
     public void trackChanged(MPDStatus mpdStatus, int oldTrack) {
         if (DEBUG) System.out.println("Track changed");
-        write(new MPDResponse(MPDResponse.EVENT_TRACK, mpdStatus, oldTrack));
+        sendResponse(new MPDResponse(MPDResponse.EVENT_TRACK, mpdStatus, oldTrack));
     }
 
     @Override
     public void stateChanged(MPDStatus mpdStatus, String oldState) {
         if (DEBUG) System.out.println("State changed");
-        write(new MPDResponse(MPDResponse.EVENT_STATE, mpdStatus, oldState));
+        sendResponse(new MPDResponse(MPDResponse.EVENT_STATE, mpdStatus, oldState));
     }
 
     @Override
     public void repeatChanged(boolean repeating) {
         if (DEBUG) System.out.println("Repeat changed");
-        write(new MPDResponse(MPDResponse.EVENT_REPEAT, repeating));
+        sendResponse(new MPDResponse(MPDResponse.EVENT_REPEAT, repeating));
     }
 
     @Override
     public void randomChanged(boolean random) {
         if (DEBUG) System.out.println("Random changed");
-        write(new MPDResponse(MPDResponse.EVENT_RANDOM, random));
+        sendResponse(new MPDResponse(MPDResponse.EVENT_RANDOM, random));
     }
 
     @Override
     public void connectionStateChanged(boolean connected, boolean connectionLost) {
         if (DEBUG) System.out.println("Connection State changed");
-        write(new MPDResponse(MPDResponse.EVENT_CONNECTIONSTATE, connected, connectionLost));
+        sendResponse(new MPDResponse(MPDResponse.EVENT_CONNECTIONSTATE, connected, connectionLost));
     }
 
     @Override
     public void libraryStateChanged(boolean updating) {
         if (DEBUG) System.out.println("Library state changed");
-        write(new MPDResponse(MPDResponse.EVENT_UPDATESTATE, updating));
+        sendResponse(new MPDResponse(MPDResponse.EVENT_UPDATESTATE, updating));
     }
 
     @Override
     public void trackPositionChanged(MPDStatus status) {
         if (DEBUG) System.out.println("Track position changed");
-        write(new MPDResponse(MPDResponse.EVENT_TRACKPOSITION, status));
+        sendResponse(new MPDResponse(MPDResponse.EVENT_TRACKPOSITION, status));
     }
 }

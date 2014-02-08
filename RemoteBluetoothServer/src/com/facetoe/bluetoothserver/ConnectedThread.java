@@ -1,8 +1,5 @@
 package com.facetoe.bluetoothserver;
 
-import org.a0z.mpdlocal.*;
-import org.a0z.mpdlocal.event.StatusChangeListener;
-import org.a0z.mpdlocal.event.TrackPositionListener;
 import org.a0z.mpdlocal.exception.MPDServerException;
 
 import javax.microedition.io.StreamConnection;
