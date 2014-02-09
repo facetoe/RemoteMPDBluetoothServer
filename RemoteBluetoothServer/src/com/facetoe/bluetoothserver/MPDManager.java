@@ -1,5 +1,7 @@
 package com.facetoe.bluetoothserver;
 
+import com.facetoe.bluetoothserver.commands.BTServerCommand;
+import com.facetoe.bluetoothserver.commands.PlaylistCommand;
 import com.google.gson.Gson;
 import org.a0z.mpdlocal.*;
 import org.a0z.mpdlocal.event.StatusChangeListener;
@@ -9,6 +11,7 @@ import org.a0z.mpdlocal.exception.MPDServerException;
 import javax.microedition.io.StreamConnection;
 import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 import java.io.*;
+import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
@@ -23,12 +26,10 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
     private final boolean DEBUG = true;
     private final MPD mpd;
     private final Gson gson = new Gson();
-    private MessageDigest md5;
-    private String oldMusicListHash = "";
 
     private StreamConnection connection;
     private BufferedReader inputStream;
-    private PrintStream outputStream;
+    private BufferedWriter outputStream;
 
     private static final Pattern digit = Pattern.compile("\\d+");
     private String host;
@@ -44,11 +45,6 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
         this.port = port;
         this.host = host;
         this.mpd = new MPD();
-        try {
-            md5 = MessageDigest.getInstance("MD5");
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        }
         initConnection();
     }
 
@@ -60,10 +56,15 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
         statusMonitor.addTrackPositionListener(this);
         statusMonitor.start();
 
-        inputStream = new BufferedReader(new InputStreamReader(connection.openInputStream()));
-        outputStream = new PrintStream(new BufferedOutputStream(connection.openOutputStream()), true, "UTF-8");
+        inputStream = new BufferedReader(
+                new InputStreamReader(
+                        connection.openInputStream(),
+                        Charset.forName("UTF-8")));
 
-        oldMusicListHash = computeMD5Hash(getMusicList());
+        outputStream = new BufferedWriter(
+                new OutputStreamWriter(
+                        connection.openOutputStream(),
+                        Charset.forName("UTF-8")));
     }
 
     public void run() throws IOException {
@@ -72,6 +73,7 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
             if (DEBUG) System.out.println("Waiting for input...");
 
             input = inputStream.readLine();
+            System.out.println("Received: " + input);
 
             // If input is null the remote side closed the connection.
             if (input == null) {
@@ -97,7 +99,7 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
     }
 
     private void processCommand(String command) {
-        if(command.isEmpty()) return;
+        if (command.isEmpty()) return;
 
         try {
             if (command.equals(MPDCommand.MPD_CMD_PLAY))
@@ -110,28 +112,23 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
                 mpd.adjustVolume(extractInt(command));
             else if (command.startsWith(MPDCommand.MPD_CMD_PLAY_ID))
                 mpd.skipToId(extractInt(command));
-            else if (command.startsWith(MPDCommand.MPD_CMD_PLAYLIST_CHANGES))
-                updatePlaylist();
             else if (command.equals(MPDCommand.MPD_CMD_STOP))
                 mpd.stop();
-            else if(command.equals(BTServerCommand.REQUEST_PLAYLIST_HASH))
-                sendPlaylistHash();
+            else if (command.startsWith(PlaylistCommand.MPD_CMD_PLAYLIST_CHANGES))
+                sendPlaylistChanges(command);
 
-            else if (DEBUG)
+            else
                 System.out.println("Unknown command: " + command);
         } catch (MPDServerException e) {
             e.printStackTrace();
         }
     }
 
-    private void sendPlaylistHash() {
-        try {
-            List<Music> playlist = mpd.getPlaylistSongs();
-            String hash = computeMD5Hash(playlist);
-            sendResponse(new MPDResponse(MPDResponse.EVENT_CHECK_PLAYLIST_HASH, hash));
-        } catch (MPDServerException e) {
-            e.printStackTrace();
-        }
+    private void sendPlaylistChanges(String command) throws MPDServerException {
+        int playlistVersion = extractInt(command);
+        List<Music> changes = mpd.getPlaylist().getPlaylistChanges(playlistVersion);
+        sendResponse(new MPDResponse(MPDResponse.EVENT_GET_PLAYLIST_CHANGES, changes));
+        System.out.println("Sent " + changes.size() + "changed songs.");
     }
 
     private int extractInt(String str) {
@@ -144,10 +141,16 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
 
     private void sendResponse(Object obj) {
         write(gson.toJson(obj));
+        System.out.println("Sent: " + obj.toString());
     }
 
     private void write(String message) {
-        outputStream.println(message);
+        try {
+            outputStream.write(message + "\n");
+            outputStream.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -159,45 +162,7 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
     @Override
     public void playlistChanged(MPDStatus mpdStatus, int oldPlaylistVersion) {
         if (DEBUG) System.out.println("Playlist changed");
-        maybeUpdatePlaylist();
-    }
-
-    private void maybeUpdatePlaylist() {
-        if(playlistHashChanged())
-            updatePlaylist();
-    }
-
-    private boolean playlistHashChanged() {
-        List<Music> musicList = getMusicList();
-        String newMusicListHash = computeMD5Hash(musicList);
-        return !oldMusicListHash.equals(newMusicListHash);
-    }
-
-    private String computeMD5Hash(Object data) {
-        String hash = "";
-        try {
-            byte[] dataBytes = data.toString().getBytes("UTF-8");
-            hash =  (new HexBinaryAdapter()).marshal(md5.digest(dataBytes));
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-        return hash;
-    }
-
-    private void updatePlaylist() {
-        if(DEBUG) System.out.println("Updating playlist");
-        List<Music> music = getMusicList();
-        oldMusicListHash = computeMD5Hash(music);
-        sendResponse(new MPDResponse(MPDResponse.EVENT_UPDATE_PLAYLIST, new MPDCachedPlaylist(oldMusicListHash, music)));
-    }
-
-    private List<Music> getMusicList() {
-        try {
-            return mpd.getPlaylistSongs();
-        } catch (MPDServerException e) {
-            e.printStackTrace();
-        }
-        return Collections.emptyList();
+        sendResponse(new MPDResponse(MPDResponse.EVENT_PLAYLIST, mpdStatus, oldPlaylistVersion));
     }
 
     @Override
