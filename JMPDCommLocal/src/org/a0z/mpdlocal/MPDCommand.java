@@ -46,9 +46,6 @@ public class MPDCommand extends AbstractCommand {
     public static final String MPD_CMD_PLAYLIST_MOVE = "playlistmove";
     public static final String MPD_CMD_PLAYLIST_DEL = "playlistdelete";
 
-    // Refresh the playlist
-    public static final String MPD_CMD_PLAYLIST_CHANGES = "plchanges";
-
     public static final String MPD_CMD_IDLE="idle";
     public static final String MPD_CMD_PING = "ping";
 

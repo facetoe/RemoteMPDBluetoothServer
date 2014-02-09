@@ -239,6 +239,11 @@ public class MPDPlaylist extends AbstractStatusChangeListener {
 		return status.getPlaylistVersion();
 	}
 
+    public List<Music> getPlaylistChanges(int playlistVersion) throws MPDServerException {
+        List<String> response = this.mpd.getMpdConnection().sendCommand(MPD_CMD_PLAYLIST_CHANGES, Integer.toString(playlistVersion));
+        return Music.getMusicFromList(response, false);
+    }
+
 	/**
 	 * Remove playlist entry at position index.
 	 *
@@ -246,7 +251,6 @@ public class MPDPlaylist extends AbstractStatusChangeListener {
 	 *           position of the entry to be removed.
 	 * @throws MPDServerException
 	 *            if an error occur while contacting server.
-	 * @see #removeId(int)
 	 */
 	public void removeByIndex(int position) throws MPDServerException {
 		this.mpd.getMpdConnection().sendCommand(MPD_CMD_PLAYLIST_REMOVE, Integer.toString(position));

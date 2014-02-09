@@ -3,6 +3,7 @@ package com.facetoe.bluetoothserver;
 import com.google.gson.Gson;
 
 import java.io.Serializable;
+import java.util.Arrays;
 
 /**
  * Created by facetoe on 26/12/13.
@@ -29,8 +30,9 @@ public class MPDResponse implements Serializable {
     public static final int EVENT_UPDATESTATE = 17;
     public static final int EVENT_VOLUME = 18;
     public static final int EVENT_TRACKPOSITION = 19;
-    public static final int EVENT_UPDATE_PLAYLIST = 20;
-    public static final int EVENT_CHECK_PLAYLIST_HASH = 21;
+
+    // Events I've added for Bluetooth
+    public static final int EVENT_GET_PLAYLIST_CHANGES = 20;
 
     private int responseType;
     private int numObjects;
@@ -58,5 +60,13 @@ public class MPDResponse implements Serializable {
 
     public int getNumObjects() {
         return numObjects;
+    }
+
+    @Override
+    public String toString() {
+        return "MPDResponse{" +
+                "responseType=" + responseType +
+                ", numObjects=" + numObjects +
+                '}';
     }
 }
