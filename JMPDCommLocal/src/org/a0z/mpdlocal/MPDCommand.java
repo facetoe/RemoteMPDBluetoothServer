@@ -1,9 +1,9 @@
 package org.a0z.mpdlocal;
 
 import java.util.Arrays;
+import java.util.List;
 
 public class MPDCommand extends AbstractCommand {
-    private static final boolean DEBUG = false;
 
     public static final int MIN_VOLUME = 0;
     public static final int MAX_VOLUME = 100;
@@ -41,12 +41,14 @@ public class MPDCommand extends AbstractCommand {
     public static final String MPD_CMD_OUTPUTENABLE = "enableoutput";
     public static final String MPD_CMD_OUTPUTDISABLE = "disableoutput";
     public static final String MPD_CMD_PLAYLIST_INFO = "listplaylistinfo";
-    public static final String MPD_CMD_PLAYLIST_INFO_TEST = "playlistinfo";
     public static final String MPD_CMD_PLAYLIST_ADD = "playlistadd";
     public static final String MPD_CMD_PLAYLIST_MOVE = "playlistmove";
     public static final String MPD_CMD_PLAYLIST_DEL = "playlistdelete";
 
-    public static final String MPD_CMD_IDLE="idle";
+    public static final List<String> NON_RETRYABLE_COMMANDS = Arrays.asList(MPD_CMD_NEXT,
+            MPD_CMD_PREV, MPD_CMD_PLAYLIST_ADD, MPD_CMD_PLAYLIST_MOVE, MPD_CMD_PLAYLIST_DEL);
+
+    public static final String MPD_CMD_IDLE = "idle";
     public static final String MPD_CMD_PING = "ping";
 
     // deprecated commands
@@ -71,18 +73,35 @@ public class MPDCommand extends AbstractCommand {
     public static final String MPD_TAG_ALBUM_ARTIST = "albumartist";
     public static final String MPD_TAG_GENRE = "genre";
 
+    protected boolean sentToServer = false;
+    protected boolean synchronous = true;
+
     public MPDCommand(String _command, String... _args) {
         super(_command, _args);
-        setNonRetryableCommands();
     }
 
     public MPDCommand(String command, String[] args, boolean synchronous) {
         super(command, args);
         this.synchronous = synchronous;
-        setNonRetryableCommands();
     }
 
-    private void setNonRetryableCommands() {
-        NON_RETRYABLE_COMMANDS = Arrays.asList(MPD_CMD_NEXT, MPD_CMD_PREV, MPD_CMD_PLAYLIST_ADD, MPD_CMD_PLAYLIST_MOVE, MPD_CMD_PLAYLIST_DEL);
+    public static boolean isRetryable(String command) {
+        return !NON_RETRYABLE_COMMANDS.contains(command);
+    }
+
+    public boolean isSentToServer() {
+        return sentToServer;
+    }
+
+    public void setSentToServer(boolean sentToServer) {
+        this.sentToServer = sentToServer;
+    }
+
+    public boolean isSynchronous() {
+        return synchronous;
+    }
+
+    public void setSynchronous(boolean synchronous) {
+        this.synchronous = synchronous;
     }
 }

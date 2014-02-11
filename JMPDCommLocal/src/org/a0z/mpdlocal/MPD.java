@@ -1344,7 +1344,7 @@ public class MPD {
     public List<Music> getPlaylistSongs(String playlistName) throws MPDServerException {
         String args[] = new String[1];
         if (playlistName.isEmpty()) {
-            List<String> res = mpdConnection.sendCommand(MPDCommand.MPD_CMD_PLAYLIST_INFO_TEST);
+            List<String> res = mpdConnection.sendCommand(MPDCommand.MPD_CMD_PLAYLIST_INFO);
             return Music.getMusicFromList(res, true);
         }
         args[0] = playlistName;
@@ -1358,7 +1358,7 @@ public class MPD {
     }
 
     public List<Music> getPlaylistSongs() throws MPDServerException {
-        List<String> result = mpdConnection.sendCommand(MPDCommand.MPD_CMD_PLAYLIST_INFO_TEST);
+        List<String> result = mpdConnection.sendCommand(MPDCommand.MPD_CMD_PLAYLIST_INFO);
         return Music.getMusicFromList(result, true);
     }
 
