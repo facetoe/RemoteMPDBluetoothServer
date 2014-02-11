@@ -1,7 +1,5 @@
 package com.facetoe.bluetoothserver;
 
-import com.facetoe.bluetoothserver.commands.BTServerCommand;
-import com.facetoe.bluetoothserver.commands.PlaylistCommand;
 import com.google.gson.Gson;
 import org.a0z.mpdlocal.*;
 import org.a0z.mpdlocal.event.StatusChangeListener;
@@ -9,12 +7,8 @@ import org.a0z.mpdlocal.event.TrackPositionListener;
 import org.a0z.mpdlocal.exception.MPDServerException;
 
 import javax.microedition.io.StreamConnection;
-import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 import java.io.*;
 import java.nio.charset.Charset;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -36,6 +30,7 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
     private int port;
     private String password;
     private MPDStatusMonitor statusMonitor;
+    private boolean readingBulkCommandList = false;
 
     public MPDManager(StreamConnection connection, String password, int port, String host)
             throws MPDServerException, IOException {
@@ -98,8 +93,10 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
         if (DEBUG) System.out.println("Connection closed.");
     }
 
-    private void processCommand(String command) {
-        if (command.isEmpty()) return;
+    private void processCommand(String input) {
+        if (input.isEmpty()) return;
+        BTServerCommand btCommand = gson.fromJson(input, BTServerCommand.class);
+        String command = btCommand.getCommand();
 
         try {
             if (command.equals(MPDCommand.MPD_CMD_PLAY))
@@ -109,34 +106,42 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
             else if (command.equals(MPDCommand.MPD_CMD_PREV))
                 mpd.previous();
             else if (command.equals(MPDCommand.MPD_CMD_VOLUME))
-                mpd.adjustVolume(extractInt(command));
+                mpd.adjustVolume(Integer.parseInt(btCommand.getArgs()[0]));
             else if (command.startsWith(MPDCommand.MPD_CMD_PLAY_ID))
-                mpd.skipToId(extractInt(command));
+                mpd.skipToId(Integer.parseInt(btCommand.getArgs()[0]));
             else if (command.equals(MPDCommand.MPD_CMD_STOP))
                 mpd.stop();
-            else if (command.startsWith(PlaylistCommand.MPD_CMD_PLAYLIST_CHANGES))
-                sendPlaylistChanges(command);
-
+            else if (command.startsWith(BTServerCommand.MPD_CMD_PLAYLIST_CHANGES))
+                sendPlaylistChanges(btCommand);
+            else if (BTServerCommand.isBulkCommand(command) || readingBulkCommandList)
+                processBulkCommand(btCommand);
             else
-                System.out.println("Unknown command: " + command);
+                System.out.println("Waht happ: " + command);
+
         } catch (MPDServerException e) {
             e.printStackTrace();
         }
     }
 
-    private void sendPlaylistChanges(String command) throws MPDServerException {
-        int playlistVersion = extractInt(command);
+    private void processBulkCommand(BTServerCommand btCommand) throws MPDServerException {
+        String command = btCommand.getCommand();
+        if (command.equals(BTServerCommand.MPD_CMD_START_BULK)) {
+            readingBulkCommandList = true;
+
+        } else if (command.equals(BTServerCommand.MPD_CMD_END_BULK)) {
+            mpd.getMpdConnection().sendCommandQueue();
+            readingBulkCommandList = false;
+
+        } else {
+            mpd.getMpdConnection().queueCommand(btCommand.getCommand(), btCommand.getArgs());
+        }
+    }
+
+    private void sendPlaylistChanges(BTServerCommand command) throws MPDServerException {
+        int playlistVersion = Integer.parseInt(command.getArgs()[0]);
         List<Music> changes = mpd.getPlaylist().getPlaylistChanges(playlistVersion);
         sendResponse(new MPDResponse(MPDResponse.EVENT_GET_PLAYLIST_CHANGES, changes));
         System.out.println("Sent " + changes.size() + "changed songs.");
-    }
-
-    private int extractInt(String str) {
-        Matcher m = digit.matcher(str);
-        if (m.find())
-            return Integer.parseInt(m.group());
-        else
-            return -1;
     }
 
     private void sendResponse(Object obj) {
