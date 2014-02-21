@@ -100,11 +100,26 @@ public class BTServerCommand extends AbstractCommand {
 
     protected static List<String> BULK_COMMANDS = Arrays.asList(MPD_CMD_START_BULK, MPD_CMD_START_BULK_OK, MPD_CMD_BULK_SEP, MPD_CMD_END_BULK);
 
+    private boolean synchronous = false;
+
     public BTServerCommand(String _command, String... _args) {
         super(_command, _args);
     }
 
+    public BTServerCommand(String command, String[] args, boolean isSynchronous) {
+        super(command, args);
+        synchronous = isSynchronous;
+    }
+
     public static boolean isBulkCommand(String command) {
-        return !BULK_COMMANDS.contains(command);
+        return BULK_COMMANDS.contains(command);
+    }
+
+    public boolean isSynchronous() {
+        return synchronous;
+    }
+
+    public void setSynchronous(boolean synchronous) {
+        this.synchronous = synchronous;
     }
 }

@@ -1,9 +1,9 @@
 package com.facetoe.bluetoothserver;
 
 import com.google.gson.Gson;
-import org.a0z.mpdlocal.*;
-import org.a0z.mpdlocal.event.StatusChangeListener;
-import org.a0z.mpdlocal.event.TrackPositionListener;
+import org.a0z.mpdlocal.MPD;
+import org.a0z.mpdlocal.MPDCommand;
+import org.a0z.mpdlocal.MPDRawChangeMonitor;
 import org.a0z.mpdlocal.exception.MPDServerException;
 
 import javax.microedition.io.StreamConnection;
@@ -16,7 +16,8 @@ import java.util.regex.Pattern;
 /**
  * Created by facetoe on 31/12/13.
  */
-public class MPDManager implements TrackPositionListener, StatusChangeListener {
+
+public class MPDManager implements MPDRawChangeMonitor.MPDRawChangeListener {
     private final boolean DEBUG = true;
     private final MPD mpd;
     private final Gson gson = new Gson();
@@ -25,11 +26,10 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
     private BufferedReader inputStream;
     private BufferedWriter outputStream;
 
-    private static final Pattern digit = Pattern.compile("\\d+");
     private String host;
     private int port;
     private String password;
-    private MPDStatusMonitor statusMonitor;
+    private MPDRawChangeMonitor changeMonitor;
     private boolean readingBulkCommandList = false;
 
     public MPDManager(StreamConnection connection, String password, int port, String host)
@@ -46,10 +46,9 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
     private void initConnection() throws MPDServerException, IOException {
         mpd.connect(host, port, password);
 
-        statusMonitor = new MPDStatusMonitor(mpd, 1000);
-        statusMonitor.addStatusChangeListener(this);
-        statusMonitor.addTrackPositionListener(this);
-        statusMonitor.start();
+        changeMonitor = new MPDRawChangeMonitor(mpd, 1000);
+        changeMonitor.addMPDRawChangeListener(this);
+        changeMonitor.start();
 
         inputStream = new BufferedReader(
                 new InputStreamReader(
@@ -82,7 +81,7 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
 
     private void shutDown() throws IOException {
         try {
-            statusMonitor.giveup();
+            changeMonitor.giveup();
             mpd.disconnect();
             inputStream.close();
             outputStream.close();
@@ -99,49 +98,41 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
         String command = btCommand.getCommand();
 
         try {
-            if (command.equals(MPDCommand.MPD_CMD_PLAY))
-                mpd.play();
-            else if (command.equals(MPDCommand.MPD_CMD_NEXT))
-                mpd.next();
-            else if (command.equals(MPDCommand.MPD_CMD_PREV))
-                mpd.previous();
-            else if (command.equals(MPDCommand.MPD_CMD_VOLUME))
-                mpd.adjustVolume(Integer.parseInt(btCommand.getArgs()[0]));
-            else if (command.startsWith(MPDCommand.MPD_CMD_PLAY_ID))
-                mpd.skipToId(Integer.parseInt(btCommand.getArgs()[0]));
-            else if (command.equals(MPDCommand.MPD_CMD_STOP))
-                mpd.stop();
-            else if (command.startsWith(BTServerCommand.MPD_CMD_PLAYLIST_CHANGES))
-                sendPlaylistChanges(btCommand);
-            else if (BTServerCommand.isBulkCommand(command) || readingBulkCommandList)
-                processBulkCommand(btCommand);
-            else
-                System.out.println("Waht happ: " + command);
+            if (btCommand.isSynchronous()) {
+                handleSyncronous(btCommand);
+
+            } else if (BTServerCommand.isBulkCommand(command) || readingBulkCommandList) {
+                processBulkCommand(command);
+
+            } else {
+                mpd.getMpdConnection().sendCommand(new MPDCommand(btCommand.getCommand(), btCommand.getArgs()));
+            }
 
         } catch (MPDServerException e) {
             e.printStackTrace();
         }
     }
 
-    private void processBulkCommand(BTServerCommand btCommand) throws MPDServerException {
-        String command = btCommand.getCommand();
-        if (command.equals(BTServerCommand.MPD_CMD_START_BULK)) {
-            readingBulkCommandList = true;
+    private void handleSyncronous(BTServerCommand btCommand) throws MPDServerException {
+        List<String> result = mpd.getMpdConnection().sendCommand(btCommand.getCommand(), btCommand.getArgs());
+        System.out.println("Got " + result.size() + " results");
+        MPDResponse response = new MPDResponse(MPDResponse.SYNC_READ_WRITE, result);
+        response.setSynchronous(true);
+        sendResponse(response);
 
-        } else if (command.equals(BTServerCommand.MPD_CMD_END_BULK)) {
+    }
+
+    private void processBulkCommand(String input) throws MPDServerException {
+        BTServerCommand btCommand = gson.fromJson(input, BTServerCommand.class);
+
+        if (btCommand.getCommand().equals(BTServerCommand.MPD_CMD_START_BULK)) {
+            readingBulkCommandList = true;
+        } else if (input.equals(BTServerCommand.MPD_CMD_END_BULK)) {
             mpd.getMpdConnection().sendCommandQueue();
             readingBulkCommandList = false;
-
         } else {
             mpd.getMpdConnection().queueCommand(btCommand.getCommand(), btCommand.getArgs());
         }
-    }
-
-    private void sendPlaylistChanges(BTServerCommand command) throws MPDServerException {
-        int playlistVersion = Integer.parseInt(command.getArgs()[0]);
-        List<Music> changes = mpd.getPlaylist().getPlaylistChanges(playlistVersion);
-        sendResponse(new MPDResponse(MPDResponse.EVENT_GET_PLAYLIST_CHANGES, changes));
-        System.out.println("Sent " + changes.size() + "changed songs.");
     }
 
     private void sendResponse(Object obj) {
@@ -159,56 +150,8 @@ public class MPDManager implements TrackPositionListener, StatusChangeListener {
     }
 
     @Override
-    public void volumeChanged(MPDStatus mpdStatus, int oldVolume) {
-        if (DEBUG) System.out.println("Volume changed");
-        sendResponse(new MPDResponse(MPDResponse.EVENT_VOLUME, mpdStatus, oldVolume));
-    }
-
-    @Override
-    public void playlistChanged(MPDStatus mpdStatus, int oldPlaylistVersion) {
-        if (DEBUG) System.out.println("Playlist changed");
-        sendResponse(new MPDResponse(MPDResponse.EVENT_PLAYLIST, mpdStatus, oldPlaylistVersion));
-    }
-
-    @Override
-    public void trackChanged(MPDStatus mpdStatus, int oldTrack) {
-        if (DEBUG) System.out.println("Track changed");
-        sendResponse(new MPDResponse(MPDResponse.EVENT_TRACK, mpdStatus, oldTrack));
-    }
-
-    @Override
-    public void stateChanged(MPDStatus mpdStatus, String oldState) {
-        if (DEBUG) System.out.println("State changed");
-        sendResponse(new MPDResponse(MPDResponse.EVENT_STATE, mpdStatus, oldState));
-    }
-
-    @Override
-    public void repeatChanged(boolean repeating) {
-        if (DEBUG) System.out.println("Repeat changed");
-        sendResponse(new MPDResponse(MPDResponse.EVENT_REPEAT, repeating));
-    }
-
-    @Override
-    public void randomChanged(boolean random) {
-        if (DEBUG) System.out.println("Random changed");
-        sendResponse(new MPDResponse(MPDResponse.EVENT_RANDOM, random));
-    }
-
-    @Override
-    public void connectionStateChanged(boolean connected, boolean connectionLost) {
-        if (DEBUG) System.out.println("Connection State changed");
-        sendResponse(new MPDResponse(MPDResponse.EVENT_CONNECTIONSTATE, connected, connectionLost));
-    }
-
-    @Override
-    public void libraryStateChanged(boolean updating) {
-        if (DEBUG) System.out.println("Library state changed");
-        sendResponse(new MPDResponse(MPDResponse.EVENT_UPDATESTATE, updating));
-    }
-
-    @Override
-    public void trackPositionChanged(MPDStatus status) {
-        if (DEBUG) System.out.println("Track position changed");
-        sendResponse(new MPDResponse(MPDResponse.EVENT_TRACKPOSITION, status));
+    public void updateChanges(List<String> changes) {
+        MPDResponse changeResponse = new MPDResponse(MPDResponse.EVENT_UPDATE_RAW_CHANGES, changes);
+        sendResponse(changeResponse);
     }
 }
