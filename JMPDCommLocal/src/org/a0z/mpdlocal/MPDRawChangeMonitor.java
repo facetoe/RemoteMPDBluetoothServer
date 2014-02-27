@@ -6,12 +6,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
+ * ${PROJECT_NAME}
  * Created by facetoe on 30/12/13.
+ *
+ * This class waits for changes from MPD and then passes the changes to any listeners.
+
  */
 public class MPDRawChangeMonitor extends Thread {
 
     public interface MPDRawChangeListener {
         void updateChanges(List<String> changes);
+        void notifyError(Exception e);
     }
 
     protected int delay;
@@ -37,7 +42,10 @@ public class MPDRawChangeMonitor extends Thread {
                 List<String> changes = mpd.waitForChanges();
                 notifyChanges(changes);
             } catch (MPDServerException e) {
-                e.printStackTrace();
+                // This always gets thrown when killing the connection
+                if(!e.getMessage().equals("The MPD request has been canceled")) {
+                    notifyError(e);
+                }
             }
         }
     }
@@ -45,6 +53,12 @@ public class MPDRawChangeMonitor extends Thread {
     private void notifyChanges(List<String> changes) {
         for (MPDRawChangeListener listener : changeListeners) {
             listener.updateChanges(changes);
+        }
+    }
+
+    private void notifyError(Exception e) {
+        for (MPDRawChangeListener listener : changeListeners) {
+            listener.notifyError(e);
         }
     }
 

@@ -9,9 +9,19 @@ public abstract class AbstractCommand {
     String command = null;
     String[] args = null;
 
+    protected boolean synchronous = false;
+
     public AbstractCommand(String _command, String... _args) {
         this.command = _command;
         this.args = _args;
+    }
+
+    public boolean isSynchronous() {
+        return synchronous;
+    }
+
+    public void setSynchronous(boolean synchronous) {
+        this.synchronous = synchronous;
     }
 
     public String toString() {

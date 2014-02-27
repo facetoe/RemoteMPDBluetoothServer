@@ -1,8 +1,5 @@
 package com.facetoe.bluetoothserver;
 
-
-import org.a0z.mpdlocal.exception.MPDServerException;
-
 import javax.bluetooth.BluetoothStateException;
 import javax.bluetooth.DiscoveryAgent;
 import javax.bluetooth.LocalDevice;
@@ -47,7 +44,7 @@ public class WaitThread implements Runnable {
         try {
             local = LocalDevice.getLocalDevice();
             local.setDiscoverable(DiscoveryAgent.GIAC);
-            String url = getUrl();
+            String url = createURL();
             notifier = (StreamConnectionNotifier) Connector.open(url);
         } catch (BluetoothStateException e) {
             System.err.println("Bluetooth is not turned on.");
@@ -57,7 +54,7 @@ public class WaitThread implements Runnable {
         return notifier;
     }
 
-    private String getUrl() {
+    private String createURL() {
         UUID uuid = new UUID("04c6093b00001000800000805f9b34fb", false);
         return "btspp://localhost:" + uuid.toString() + ";name=RemoteBluetooth";
     }

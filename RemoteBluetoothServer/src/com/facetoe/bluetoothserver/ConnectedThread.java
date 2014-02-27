@@ -8,7 +8,6 @@ import java.io.IOException;
 public class ConnectedThread extends Thread {
     StreamConnection connection;
     public ConnectedThread(StreamConnection connection) {
-        System.out.println("Entered ConnectedThread: " + Thread.currentThread().getName());
         this.connection = connection;
     }
 
@@ -22,9 +21,7 @@ public class ConnectedThread extends Thread {
             manager.run();
 
         } catch (IOException e) {
-            e.printStackTrace();
-        } catch (MPDServerException e) {
-            e.printStackTrace();
+            System.err.println("Exception in ConnectedThread: " + e.getMessage());
         }
     }
 }
